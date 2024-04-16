@@ -1,14 +1,17 @@
 ﻿using System.Net.Sockets;
 using System.Net;
 using System.Xml.Linq;
+using KSiS2;
+using System.Text;
 
 namespace KSIS2Client
 {
     public partial class MainPage : ContentPage
     {
-        string username = "";
+        private string Username { get; set; }
 
-        List<Network.MessageInfo> messages = new List<Network.MessageInfo>();
+        private static List<Message> Messages = new List<Message>();
+
 
         public MainPage()
         {
@@ -21,8 +24,8 @@ namespace KSIS2Client
             do
             { 
                 isCorrect = true;
-                username = nickEntry.Text;
-                if (username.Length == 0)
+                Username = nickEntry.Text;
+                if (Username.Length == 0)
                 {
                     await DisplayAlert("Ошибка", "Пустой никнейм!", "ОK");
                     isCorrect = false;
@@ -53,6 +56,20 @@ namespace KSIS2Client
             portEntry.IsEnabled = UsernameBtn.IsEnabled;    
         }
 
+        private void AddToChat(string message)
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                Label label = new Label
+                {
+                    Text = message,
+                    FontSize = 12,
+
+                };
+
+                ChatCont.Children.Add(label);
+            });
+        }
 
         private async void SendButton_Clicked(object sender, EventArgs e)
         {
@@ -85,22 +102,71 @@ namespace KSIS2Client
             IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(ipAddress), port);
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             socket.Connect(ipPoint!);
-            messages.Add(Network.CommunicateWithServer(socket, username, MessageEntry.Text));
-            AddToChat(messages.Last().Username + ": " + messages.Last().Message);
-            socket.Shutdown(SocketShutdown.Both);
-            socket.Close();
-        }
-        private void AddToChat(string message)
-        {
-            Label label = new Label
+            var message = new Message((socket.LocalEndPoint as IPEndPoint)!, Username);
+            message.MessageType = MessageType.Init;
+            socket.Send(message.GetSerializedBytes());
+
+            /* Messages.Add(Client.CommunicateWithServer(socket, username, MessageEntry.Text));
+             AddToChat(Messages.Last().Username + ": " + messages.Last().Message);
+             socket.Shutdown(SocketShutdown.Both);
+             socket.Close();*/
+            Thread thread = new Thread(() =>
             {
-                Text = message,
-                FontSize = 12,
-
-            };
-
-            ChatCont.Children.Add(label);
+                Thread send = new Thread(() => { SendDataThread(socket); });
+                Thread receive = new Thread(() => { ReceiveDataThread(socket);  });
+            });
         }
+
+        public void SendDataThread(Socket socket)
+        {
+
+        }
+
+        public void ReceiveDataThread(Socket socket)
+        {
+
+        }
+
+
+        /*public static MessageInfo CommunicateWithClient(Socket clientSocket)
+        {
+            StringBuilder inputMessage = new StringBuilder();
+            int bytesRead = 0;
+            byte[] inputData = new byte[256];
+            do
+            {
+                bytesRead = clientSocket.Receive(inputData);
+            }
+            while (bytesRead > 0);
+            //Console.WriteLine(DateTime.Now.ToShortTimeString() + ": " + inputMessage.ToString());
+            byte[] outputData = GetMessageBytes(new MessageInfo { Username = "server", Message = "сообщение получено" });
+            clientSocket.Send(outputData);
+            return GetMessageInfo(inputData);
+        }
+
+        public static MessageInfo CommunicateWithServer(Socket socket, string username, string message)
+        {
+            var messageBytes = GetMessageBytes(new MessageInfo { Username = username, Message = message });
+            socket.Send(messageBytes);
+            socket.Shutdown(SocketShutdown.Send);
+            int bytesRead = 0;
+            List<byte> inputBuffer = new List<byte>();
+            byte[] inputData = new byte[1024];
+            MessageInfo result = new MessageInfo { Username = "Server", Message = "Empty" };
+            do
+            {
+                bytesRead = 0;
+                bytesRead = socket!.Receive(inputData);
+                foreach (byte b in inputData)
+                    if (b != '\0')
+                        inputBuffer.Add(b);
+                if (bytesRead != 0)
+                    result = GetMessageInfo(inputData);
+            }
+            while (bytesRead > 0*//* && result.Username != "server" && result.Message != "сообщение получено"*//*);
+
+            return result;
+        }*/
     }
 
 }
