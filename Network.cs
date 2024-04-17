@@ -11,18 +11,26 @@ using Newtonsoft.Json;
 
 namespace KSIS2Client
 {
-    class Network
-    {
         public struct MessageInfo
         {
+            public int Number { get; set; }
             public string Username { get; set; }
             public string Message { get; set; }
         }
+    class Network
+    {
 
         public static MessageInfo GetMessageInfo(byte[] receivedMessage)
         {
             string receivedJson = Encoding.UTF8.GetString(receivedMessage);
             MessageInfo receivedData = JsonConvert.DeserializeObject<MessageInfo>(receivedJson);
+            return receivedData;
+        }
+
+        public static List<MessageInfo> GetMessagesInfo(byte[] receivedMessage)
+        {
+            string receivedJson = Encoding.UTF8.GetString(receivedMessage);
+            var receivedData = JsonConvert.DeserializeObject<List<MessageInfo>>(receivedJson);
             return receivedData;
         }
 
@@ -32,7 +40,13 @@ namespace KSIS2Client
             byte[] buffer = Encoding.UTF8.GetBytes(json);
             return buffer;
         }
-        
+        public static byte[] GetMessagesBytes(List<MessageInfo> messages)
+        {
+            string json = JsonConvert.SerializeObject(messages);
+            byte[] buffer = Encoding.UTF8.GetBytes(json);
+            return buffer;
+        }
+
 
         public static MessageInfo CommunicateWithClient(Socket clientSocket)
         {
@@ -72,7 +86,7 @@ namespace KSIS2Client
             socket.Shutdown(SocketShutdown.Send);
             int bytesRead = 0; 
             List<byte> inputBuffer = new List<byte>();
-            byte[] inputData = new byte[256]; 
+            byte[] inputData = new byte[1024]; 
             MessageInfo result = new MessageInfo { Username = "Server", Message = "Empty" };
             do
             {
