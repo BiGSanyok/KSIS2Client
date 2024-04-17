@@ -58,8 +58,9 @@ namespace KSIS2Client
 
         private void AddToChat(string message)
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            Dispatcher.Dispatch(new Action(() =>
             {
+
                 Label label = new Label
                 {
                     Text = message,
@@ -68,7 +69,7 @@ namespace KSIS2Client
                 };
 
                 ChatCont.Children.Add(label);
-            });
+            }));
         }
 
         private async void SendButton_Clicked(object sender, EventArgs e)
