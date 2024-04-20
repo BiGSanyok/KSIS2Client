@@ -3,6 +3,9 @@ using System.Net;
 using System.Xml.Linq;
 using KSiS2;
 using System.Text;
+using System.Collections.Concurrent;
+using Obvs;
+using System.Drawing.Interop;
 
 namespace KSIS2Client
 {
@@ -11,11 +14,18 @@ namespace KSIS2Client
         private string Username { get; set; }
 
         private static List<Message> Messages = new List<Message>();
+        //private ConcurrentDictionary<IPEndPoint, byte[]> DataToSend = new();
+        private ConcurrentQueue<byte[]> DataToSend = new();
+        private IPEndPoint? LocalIPEndPoint;
 
 
         public MainPage()
         {
             InitializeComponent();
+            nickEntry.Text = "alex";
+            ipEntry.Text = "127.0.0.1";
+            portEntry.Text = "1";
+            MessageEntry.Text = "hello world!";
         }
 
         public async void GetUsername()
@@ -46,6 +56,7 @@ namespace KSIS2Client
         public void OnUsernameBtnClicked(object sender, EventArgs e)
         {
             GetUsername();
+            UsernameBtn.IsEnabled = false;
             SendButton.IsEnabled = true;
         }
 
@@ -56,11 +67,17 @@ namespace KSIS2Client
             portEntry.IsEnabled = UsernameBtn.IsEnabled;    
         }
 
-        private void AddToChat(string message)
+        private void SendButton_Clicked(object sender, EventArgs e)
         {
-            Dispatcher.Dispatch(new Action(() =>
-            {
+            Message message = new Message(LocalIPEndPoint, MessageEntry.Text);
+            message.MessageType = MessageType.Text;
+            DataToSend.Enqueue(message.GetMessageBytes());
+        }
 
+        private async Task AddToChat(string message)
+        {
+            await this.Dispatcher.DispatchAsync(() =>
+            {
                 Label label = new Label
                 {
                     Text = message,
@@ -69,10 +86,10 @@ namespace KSIS2Client
                 };
 
                 ChatCont.Children.Add(label);
-            }));
+            });
         }
 
-        private async void SendButton_Clicked(object sender, EventArgs e)
+        private async void ConnectButton_Clicked(object sender, EventArgs e)
         {
             try
             {
@@ -83,7 +100,7 @@ namespace KSIS2Client
                     try
                     {
                         ConnectToServer(ipEntry.Text, port);
-                        AddToChat("Cooщение отправлено! IP: " + ipEntry.Text + "Port: " + port.ToString());
+                        await AddToChat("Cooщение отправлено! IP: " + ipEntry.Text + "Port: " + port.ToString());
                     }
                     catch
                     {
@@ -98,14 +115,26 @@ namespace KSIS2Client
                 await DisplayAlert("Ошибка", "IP-адрес или порт введен некоректно", "ОK");
             }
         }
-        private void ConnectToServer(string ipAddress, int port)
+        private async void ConnectToServer(string ipAddress, int port)
         {
             IPEndPoint ipPoint = new IPEndPoint(IPAddress.Parse(ipAddress), port);
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             socket.Connect(ipPoint!);
+            LocalIPEndPoint = socket.LocalEndPoint as IPEndPoint;
             var message = new Message((socket.LocalEndPoint as IPEndPoint)!, Username);
             message.MessageType = MessageType.Init;
-            socket.Send(message.GetSerializedBytes());
+            //AddToChat($"Text {message.GetText()} Type {message.MessageType} IP {message.GetIPEndPoint()} length {message.GetSerializedBytes().Length }");
+            byte[] arr = [];
+            try
+            {
+                arr = message.GetSerializedBytes();
+            }
+            catch
+            {
+                await AddToChat("hah");
+            }
+                socket.Send(arr);
+
 
             /* Messages.Add(Client.CommunicateWithServer(socket, username, MessageEntry.Text));
              AddToChat(Messages.Last().Username + ": " + messages.Last().Message);
@@ -118,15 +147,71 @@ namespace KSIS2Client
             });
         }
 
-        public void SendDataThread(Socket socket)
+        private async Task Process(Socket clientSocket)
         {
-
+            var receiveTask = ReceiveDataThread(clientSocket);
+            var sendTask = SendDataThread(clientSocket);
+            await Task.WhenAny(receiveTask, sendTask); // Ждем завершения любой из задач
         }
 
-        public void ReceiveDataThread(Socket socket)
+        public async Task SendDataThread(Socket socket)
         {
-
+            while (true && socket.Connected)
+            {
+                byte[] sendBuffer = [];
+                if (DataToSend.TryDequeue(out sendBuffer))
+                {
+                    await socket.SendAsync(new ArraySegment<byte>(sendBuffer), SocketFlags.None);
+                }
+            }
         }
+
+        public async Task ReceiveDataThread(Socket socket)
+        {
+            byte[] buffer = new byte[2048];
+            while (true && socket.Connected)
+            {
+                var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), SocketFlags.None);
+                await AddToChat($"{result} received data");
+                if (result > 0)
+                {
+                    Message message = new();
+                    var answer = message;
+                    try
+                    {
+                        byte[] data = buffer.Take(result).ToArray();
+                        message = new Message(data);
+                        await AddToChat($"Text {message.GetText()} Type {message.MessageType} IP {message.GetIPEndPoint()}  ");
+                        if (message != null)
+                            answer = await ProcessMessage(message);
+                    }
+                    catch (Exception ex)
+                    {
+                        await AddToChat($"{ex.Message}");
+                    }
+                    if (answer.MessageType != MessageType.Error)
+                    {
+                        await socket.SendAsync(new ArraySegment<byte>(answer.GetSerializedBytes()), SocketFlags.None);
+                        await AddToChat("Success " + ((int)answer.MessageType).ToString());
+                    }
+                    else
+                    {
+                        await AddToChat("Error " + ((int)answer.MessageType).ToString());
+                    }
+                }
+            }
+        }
+
+        private async Task<Message> ProcessMessage(Message message)
+        {
+            return null;
+        }
+
+        private void ipOrPortEntry_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ConnectButton.IsEnabled = (IPAddress.TryParse(ipEntry.Text, out IPAddress? ipAddress) && Client.IsPortAvailable(int.Parse(portEntry.Text))); 
+        }
+
 
 
         /*public static MessageInfo CommunicateWithClient(Socket clientSocket)

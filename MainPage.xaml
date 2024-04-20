@@ -13,8 +13,9 @@
         Spacing="30">
             <Entry x:Name="nickEntry" Placeholder="Введите никнейм" FontSize="12" TextChanged="NickChanged"/>
             <Button x:Name="UsernameBtn" Text="Ввести ник" Clicked="OnUsernameBtnClicked" IsEnabled="False"/> 
-            <Entry x:Name="ipEntry" Placeholder="Введите IP сервера" FontSize="12" MinimumWidthRequest="30" IsEnabled="False" />
-            <Entry x:Name="portEntry" Placeholder="Введите порт сервера" FontSize="12" Keyboard="Numeric" MinimumWidthRequest="30" IsEnabled="False" />
+            <Entry x:Name="ipEntry" TextChanged="ipOrPortEntry_TextChanged" Placeholder="Введите IP сервера" FontSize="12" MinimumWidthRequest="20" IsEnabled="False" />
+            <Entry x:Name="portEntry" TextChanged="ipOrPortEntry_TextChanged" Placeholder="Введите порт сервера" FontSize="12" Keyboard="Numeric" MinimumWidthRequest="20" IsEnabled="False" />
+            <Button x:Name="ConnectButton" Text="Подключиться" Clicked="ConnectButton_Clicked" IsEnabled="False"/>
         </HorizontalStackLayout>
         <Border BackgroundColor="#e1e1e1" 
         StrokeThickness="4" StrokeShape="RoundRectangle 10,10,10,10">
